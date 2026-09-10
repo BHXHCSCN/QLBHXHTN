@@ -47,14 +47,14 @@
                 </select>
             </div>
             <div class="col-md-5 text-end">
-                <span id="statusLoading" class="badge bg-secondary p-2 me-2" style="display: none;">⏳ Đang tải dữ liệu...</span>
+                <span id="statusLoading" class="badge bg-secondary p-2 me-2" style="display: none;">⏳ Đang đồng bộ...</span>
                 <button class="btn btn-outline-success fw-bold me-1" onclick="xuatExcelBaoCao()">⬇ Tải Excel</button>
                 <button class="btn btn-outline-danger fw-bold" onclick="xuatPDFBaoCao()">📄 Xuất PDF</button>
             </div>
         </div>
     </div>
 
-    <!-- TỔNG HỢP THẺ SỐ LIỆU -->
+    <!-- TỔNG HỢP 4 THẺ SỐ LIỆU -->
     <div class="row g-3 mb-4">
         <div class="col"><div class="stat-box bg-secondary shadow-sm"><small>Đang quản lý</small><h3 id="stActive" class="mb-0">0</h3></div></div>
         <div class="col"><div class="stat-box bg-info text-dark shadow-sm"><small>Tăng mới</small><h3 id="stBrandNew" class="mb-0">0</h3></div></div>
@@ -62,9 +62,7 @@
         <div class="col"><div class="stat-box shadow-sm" style="background-color: #6f42c1;"><small>Đạt chỉ tiêu</small><h3 id="stTyLe" class="mb-0">0%</h3></div></div>
     </div>
 
-    <!-- ========================================== -->
     <!-- BẢNG 1: BIẾN ĐỘNG TĂNG GIẢM -->
-    <!-- ========================================== -->
     <div class="card p-3 mb-4 border-top border-primary border-4 shadow-sm">
         <h5 class="text-primary fw-bold mb-3">📈 BẢNG 1: BIẾN ĐỘNG TĂNG/GIẢM THEO XÃ THÁNG <span class="lblThang"></span></h5>
         <div class="table-responsive">
@@ -84,9 +82,7 @@
         </div>
     </div>
 
-    <!-- ========================================== -->
     <!-- BẢNG 2: TIẾN ĐỘ CHỈ TIÊU -->
-    <!-- ========================================== -->
     <div class="card p-3 border-top border-success border-4 shadow-sm">
         <h5 class="text-success fw-bold mb-3">🎯 BẢNG 2: TIẾN ĐỘ CHỈ TIÊU THEO XÃ THÁNG <span class="lblThang"></span></h5>
         <div class="table-responsive">
@@ -109,35 +105,26 @@
 </div>
 
 <script>
-    // Chỉ có 7 xã (Đã bỏ Thọ Lập theo yêu cầu)
+    // BỘ 7 XÃ CỦA CÁI NƯỚC (Đã bỏ Thọ Lập)
     const danhSachXa = ["Cái Nước", "Hưng Mỹ", "Tân Hưng", "Lương Thế Trân", "Cái Đôi Vàm", "Nguyễn Việt Khái", "Phú Tân"];
     
     let baoCaoBienDongData = [];
     let baoCaoTienDoData = [];
 
-    // Hàm chuẩn hóa chuỗi để so sánh (Xóa dấu, chuyển in thường)
+    // Hàm chuẩn hóa chuỗi để so sánh (Xóa dấu, chuyển in thường, xóa khoảng trắng thừa)
     function chuanHoaChuoi(str) {
         if (!str) return "";
         return str.toString().trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, ' ');
     }
 
-    // Hàm đánh giá tiến độ chỉ tiêu
-    function danhGiaTienDo(tyLe) {
-        if (tyLe === 0) return { text: "Chưa thực hiện", class: "bg-secondary text-white" };
-        if (tyLe < 50) return { text: "Rất thấp - Cần đôn đốc", class: "bg-danger text-white" };
-        if (tyLe < 80) return { text: "Chậm tiến độ", class: "bg-warning text-dark" };
-        if (tyLe < 100) return { text: "Cơ bản bám sát", class: "bg-info text-dark" };
-        return { text: "Vượt chỉ tiêu", class: "bg-success text-white" };
-    }
-
-    // Hàm tải file Excel từ thư mục data/ trên GitHub
+    // Hàm tải file từ Data (GitHub)
     async function docFileExcelTuURL(url) {
         try {
             const response = await fetch(url);
             if (!response.ok) return null;
             const arrayBuffer = await response.arrayBuffer();
             const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-            const sheetName = workbook.SheetNames[0]; // Lấy sheet đầu tiên
+            const sheetName = workbook.SheetNames[0]; // Luôn đọc sheet đầu tiên
             return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
         } catch (error) {
             console.error("Lỗi đọc file: " + url, error);
@@ -145,7 +132,7 @@
         }
     }
 
-    // Hàm lấy giá trị từ các cột bất chấp cách đặt tên (Mã số BHXH, Số sổ BHXH, Tên đơn vị...)
+    // Hàm lấy giá trị từ các cột có tên dễ thay đổi
     function layGiaTriCot(row, tuKhoaArr) {
         for (let key in row) {
             let kClean = chuanHoaChuoi(key);
@@ -156,20 +143,28 @@
         return "";
     }
 
-    // Xác định tên xã dựa trên cột "Mã đơn vị" hoặc "Tên đơn vị" để tránh sai sót
-    function xacDinhXaTuMaDonVi(row) {
-        let thongTinDonVi = layGiaTriCot(row, ["ma don vi", "ten don vi", "ma dv"]);
-        let thongTinChuanHoa = chuanHoaChuoi(thongTinDonVi);
+    // Hàm tra cứu "Mã đơn vị" từ file dữ liệu sang "Tên Xã" trong Từ Điển
+    function xacDinhXaTuMaDonVi(row, mappingXa) {
+        let maDonVi = layGiaTriCot(row, ["ma don vi", "ten don vi", "ma dv"]);
+        let maChuanHoa = chuanHoaChuoi(maDonVi);
         
+        // 1. Quét tìm xem mã đơn vị này thuộc mã của xã nào trong Từ Điển (đã khai báo ở danhmucxa.xlsx)
+        for (let [maTuDien, tenXa] of mappingXa.entries()) {
+            if (maChuanHoa.includes(maTuDien)) {
+                return tenXa; 
+            }
+        }
+
+        // 2. Dự phòng: Quét mò trực tiếp tên xã nếu file dữ liệu ghi hẳn tên xã
         for (let xa of danhSachXa) {
-            if (thongTinChuanHoa.includes(chuanHoaChuoi(xa))) {
+            if (maChuanHoa.includes(chuanHoaChuoi(xa))) {
                 return xa;
             }
         }
         return "Xã Khác / Chưa xác định";
     }
 
-    // HÀM CHÍNH: TẢI VÀ XỬ LÝ DỮ LIỆU
+    // HÀM CHÍNH: XỬ LÝ TOÀN BỘ NGHIỆP VỤ
     async function taiVaXuLyDuLieuExcelOnline() {
         const selectBox = document.getElementById('selectThangNam');
         const thangHienTai = selectBox.value; // VD: 08_2026
@@ -178,16 +173,16 @@
         document.querySelectorAll('.lblThang').forEach(el => el.innerText = thangHienThi);
         
         const statusEl = document.getElementById('statusLoading');
-        statusEl.innerText = "⏳ Đang tải dữ liệu từ GitHub...";
+        statusEl.innerText = "⏳ Đang tải và đồng bộ...";
         statusEl.className = "badge bg-warning text-dark p-2 me-2";
         statusEl.style.display = "inline-block";
 
-        // Xác định logic lấy file tháng trước
+        // Logic file gốc: Nếu chọn Tháng 7, file so sánh trước đó là dulieugoc.xlsx
         let fileThangTruoc = (thangHienTai === "07_2026") ? "./data/dulieugoc.xlsx" : "./data/DuLieu_07_2026.xlsx";
         let fileThangHienTai = `./data/DuLieu_${thangHienTai}.xlsx`;
         let fileDanhMuc = "./data/danhmucxa.xlsx";
 
-        // Fetch song song 3 file từ GitHub
+        // Tải 3 file song song
         const [dataHienTai, dataThangTruoc, dataDanhMuc] = await Promise.all([
             docFileExcelTuURL(fileThangHienTai),
             docFileExcelTuURL(fileThangTruoc),
@@ -195,68 +190,90 @@
         ]);
 
         if (!dataHienTai) {
-            statusEl.innerText = `❌ Lỗi: Không tìm thấy ${fileThangHienTai}`;
+            statusEl.innerText = `❌ Lỗi: Không tìm thấy file dữ liệu của tháng ${thangHienThi}`;
             statusEl.className = "badge bg-danger p-2 me-2";
-            return alert(`Không tải được dữ liệu tháng ${thangHienThi} từ thư mục data/ !`);
+            return;
         }
 
-        // Bóc tách danh mục chỉ tiêu
+        // --- XÂY DỰNG TỪ ĐIỂN TỪ FILE DANHMUCXA.XLSX ---
         let chiTieuXa = new Map();
+        let mappingXa = new Map(); // Lưu từ điển: [Mã Đơn Vị] -> [Tên Xã]
+
         if (dataDanhMuc) {
             dataDanhMuc.forEach(row => {
                 let ten = layGiaTriCot(row, ["ten xa", "xa phuong", "don vi"]);
                 let chiTieu = parseFloat(layGiaTriCot(row, ["chi tieu"]) || 0);
-                if (chiTieu > 0) {
-                    for (let xa of danhSachXa) {
-                        if (chuanHoaChuoi(ten).includes(chuanHoaChuoi(xa))) {
-                            chiTieuXa.set(xa, chiTieu);
-                            break;
-                        }
+                let maDV_DanhSach = layGiaTriCot(row, ["ma don vi", "ma dv"]); 
+                
+                let xaChuan = null;
+                for (let xa of danhSachXa) {
+                    if (chuanHoaChuoi(ten).includes(chuanHoaChuoi(xa))) {
+                        xaChuan = xa;
+                        break;
+                    }
+                }
+
+                if (xaChuan) {
+                    if (chiTieu > 0) chiTieuXa.set(xaChuan, chiTieu);
+                    
+                    // Cắt các mã đơn vị (bằng dấu phẩy) và gán cho Xã tương ứng
+                    if (maDV_DanhSach) {
+                        let cacMa = maDV_DanhSach.split(",");
+                        cacMa.forEach(ma => {
+                            if(ma.trim() !== "") {
+                                mappingXa.set(chuanHoaChuoi(ma.trim()), xaChuan);
+                            }
+                        });
                     }
                 }
             });
         }
 
-        // TÍNH TOÁN BIẾN ĐỘNG THEO SỐ SỔ BHXH
+        // --- TÍNH TOÁN BIẾN ĐỘNG BẰNG SỐ SỔ BHXH ---
         let thongKeXa = {};
         danhSachXa.forEach(xa => thongKeXa[xa] = { dangThamGia: 0, tangMoi: 0, ngungDong: 0 });
         thongKeXa["Xã Khác / Chưa xác định"] = { dangThamGia: 0, tangMoi: 0, ngungDong: 0 };
 
-        let dsSoSoHienTai = new Map(); // Dùng Map để lưu Số Sổ -> Tên Xã
+        let dsSoSoHienTai = new Map(); // Map lưu [Số Sổ] -> [Tên Xã]
 
-        // Bước 1: Quét file Tháng Hiện Tại
+        // Bước 1: Quét tháng hiện tại
         dataHienTai.forEach(row => {
             let soSo = layGiaTriCot(row, ["so so", "ma so bhxh", "ma bhxh"]);
-            if (!soSo) return;
+            if (!soSo) return; 
 
-            let tenXa = xacDinhXaTuMaDonVi(row);
+            // Xác định xã dựa vào bộ từ điển
+            let tenXa = xacDinhXaTuMaDonVi(row, mappingXa);
+            
             dsSoSoHienTai.set(soSo, tenXa);
             thongKeXa[tenXa].dangThamGia++;
         });
 
-        // Bước 2: Quét file Tháng Trước để đối chiếu Tăng / Ngừng
+        // Bước 2: Quét tháng trước để tìm "Ngừng đóng" và loại trừ người đang đóng
         if (dataThangTruoc) {
             dataThangTruoc.forEach(row => {
                 let soSo = layGiaTriCot(row, ["so so", "ma so bhxh", "ma bhxh"]);
                 if (!soSo) return;
 
-                let tenXaTruoc = xacDinhXaTuMaDonVi(row);
+                let tenXaTruoc = xacDinhXaTuMaDonVi(row, mappingXa);
 
                 if (!dsSoSoHienTai.has(soSo)) {
-                    // Có ở tháng trước nhưng không có ở tháng này -> NGỪNG ĐÓNG
+                    // Có ở tháng trước, KHÔNG có ở tháng này -> Ngừng đóng
                     thongKeXa[tenXaTruoc].ngungDong++;
                 } else {
-                    // Tồn tại ở cả 2 tháng -> Xóa khỏi Map để cuối cùng Map chỉ còn lại người mới
+                    // Có ở cả 2 tháng -> Người tham gia bình thường, xóa khỏi Map
                     dsSoSoHienTai.delete(soSo);
                 }
             });
 
-            // Những Số sổ còn lại trong Map chưa bị xóa chính là TĂNG MỚI
+            // Sau khi đối chiếu, những số sổ còn lại trong dsSoSoHienTai 100% là TĂNG MỚI
             dsSoSoHienTai.forEach((tenXa, soSo) => {
                 thongKeXa[tenXa].tangMoi++;
             });
+        } else {
+            console.warn("Không tìm thấy file dữ liệu tháng trước (Hoặc dulieugoc.xlsx)");
         }
 
+        // Gọi hàm vẽ bảng
         renderBangBaoCao(thongKeXa, chiTieuXa);
 
         statusEl.innerText = "✅ Đã tải và đồng bộ xong!";
@@ -275,12 +292,12 @@
 
         Object.keys(thongKeXa).forEach(xa => {
             let data = thongKeXa[xa];
-            if (xa === "Xã Khác / Chưa xác định" && data.dangThamGia === 0 && data.ngungDong === 0) return;
+            // Ẩn dòng "Chưa xác định" nếu không có số liệu
+            if (xa === "Xã Khác / Chưa xác định" && data.dangThamGia === 0 && data.ngungDong === 0 && data.tangMoi === 0) return;
 
             let tangGiamRong = data.tangMoi - data.ngungDong;
             let chiTieu = chiTieuXa.get(xa) || 0;
             let tyLe = chiTieu > 0 ? ((data.dangThamGia / chiTieu) * 100).toFixed(1) : 0;
-            let danhGia = danhGiaTienDo(Number(tyLe));
 
             sumActive += data.dangThamGia;
             sumTang += data.tangMoi;
@@ -288,7 +305,19 @@
             sumRong += tangGiamRong;
             sumChiTieuTotal += chiTieu;
 
-            // Lưu dữ liệu để Export Excel
+            let isKhac = xa === "Xã Khác / Chưa xác định" ? 'fst-italic text-secondary' : 'fw-bold';
+            let colorRong = tangGiamRong > 0 ? 'text-success fw-bold' : (tangGiamRong < 0 ? 'text-danger fw-bold' : 'fw-bold');
+            
+            // Xếp đánh giá hoàn thành
+            let danhGiaText = ""; let danhGiaClass = "";
+            if(xa !== "Xã Khác / Chưa xác định") {
+                if (tyLe === 0) { danhGiaText = "Chưa thực hiện"; danhGiaClass = "bg-secondary text-white"; }
+                else if (tyLe < 50) { danhGiaText = "Cần đôn đốc"; danhGiaClass = "bg-danger text-white"; }
+                else if (tyLe < 80) { danhGiaText = "Chậm tiến độ"; danhGiaClass = "bg-warning text-dark"; }
+                else if (tyLe < 100) { danhGiaText = "Bám sát"; danhGiaClass = "bg-info text-dark"; }
+                else { danhGiaText = "Vượt chỉ tiêu"; danhGiaClass = "bg-success text-white"; }
+            }
+
             baoCaoBienDongData.push({
                 "STT": stt, "Tên Xã / Phường": xa, "Đang tham gia": data.dangThamGia,
                 "Tăng mới": data.tangMoi, "Ngừng đóng": data.ngungDong, "Tăng / Giảm Ròng": tangGiamRong
@@ -296,12 +325,9 @@
 
             baoCaoTienDoData.push({
                 "STT": stt, "Tên Xã / Phường": xa, "Chỉ tiêu giao": chiTieu || "-",
-                "Đang tham gia": data.dangThamGia, "Tỷ lệ Đạt (%)": tyLe > 0 ? Number(tyLe) : "-", "Mức độ hoàn thành": xa === "Xã Khác / Chưa xác định" ? "-" : danhGia.text
+                "Đang tham gia": data.dangThamGia, "Tỷ lệ Đạt (%)": tyLe > 0 ? Number(tyLe) : "-", "Đánh giá": danhGiaText
             });
 
-            let colorRong = tangGiamRong > 0 ? 'text-success fw-bold' : (tangGiamRong < 0 ? 'text-danger fw-bold' : 'fw-bold');
-            let isKhac = xa === "Xã Khác / Chưa xác định" ? 'fst-italic text-secondary' : 'fw-bold';
-            
             tbBienDong.innerHTML += `<tr>
                 <td class="text-center">${stt}</td>
                 <td class="${isKhac}">${xa}</td>
@@ -314,21 +340,16 @@
             tbTienDo.innerHTML += `<tr>
                 <td class="text-center">${stt}</td>
                 <td class="${isKhac}">${xa}</td>
-                <td class="text-center bg-light text-secondary fw-bold">${chiTieu || '-'}</td>
+                <td class="text-center text-secondary fw-bold">${chiTieu || '-'}</td>
                 <td class="text-center bg-light fw-bold">${data.dangThamGia}</td>
                 <td class="text-center text-purple">${tyLe > 0 ? tyLe + '%' : '-'}</td>
-                <td class="text-center">${xa === "Xã Khác / Chưa xác định" ? '' : `<span class="badge-canhbao ${danhGia.class}">${danhGia.text}</span>`}</td>
+                <td class="text-center">${xa === "Xã Khác / Chưa xác định" ? '' : `<span class="badge-canhbao ${danhGiaClass}">${danhGiaText}</span>`}</td>
             </tr>`;
             stt++;
         });
 
-        // Cập nhật số tổng
-        document.getElementById('stActive').innerText = sumActive.toLocaleString();
-        document.getElementById('stBrandNew').innerText = sumTang.toLocaleString();
-        document.getElementById('stDropped').innerText = sumNgung.toLocaleString();
-        
+        // Hàng Tổng Cộng
         let tyLeChung = sumChiTieuTotal > 0 ? ((sumActive / sumChiTieuTotal) * 100).toFixed(1) : 0;
-        document.getElementById('stTyLe').innerText = tyLeChung > 0 ? tyLeChung + '%' : '0%';
         let colorSumRong = sumRong > 0 ? 'text-success fw-bold' : (sumRong < 0 ? 'text-danger fw-bold' : 'fw-bold');
 
         tbBienDong.innerHTML += `<tr class="table-secondary fw-bold">
@@ -346,9 +367,17 @@
             <td class="text-center text-purple">${tyLeChung > 0 ? tyLeChung + '%' : '-'}</td>
             <td class="text-center"></td>
         </tr>`;
+
+        // Cập nhật số tổng lên các ô thẻ (Cards)
+        document.getElementById('stActive').innerText = sumActive.toLocaleString('vi-VN');
+        document.getElementById('stBrandNew').innerText = sumTang.toLocaleString('vi-VN');
+        document.getElementById('stDropped').innerText = sumNgung.toLocaleString('vi-VN');
+        document.getElementById('stTyLe').innerText = tyLeChung > 0 ? tyLeChung + '%' : '0%';
     }
 
-    // XUẤT EXCEL
+    // ===============================================
+    // CÁC HÀM XUẤT BÁO CÁO (GIỮ NGUYÊN)
+    // ===============================================
     function xuatExcelBaoCao() {
         if (baoCaoBienDongData.length === 0) return alert("Không có dữ liệu để xuất Excel!");
         const wb = XLSX.utils.book_new();
@@ -357,7 +386,6 @@
         XLSX.writeFile(wb, `BaoCao_BHXH_Thang_${document.getElementById('selectThangNam').value}.xlsx`);
     }
 
-    // XUẤT PDF
     async function xuatPDFBaoCao() {
         const { jsPDF } = window.jspdf;
         const thangText = document.getElementById('selectThangNam').options[document.getElementById('selectThangNam').selectedIndex].text;
@@ -368,8 +396,8 @@
         printArea.style.width = '1000px';
         printArea.innerHTML = `
             <div style="text-align: center; margin-bottom: 20px; font-family: Arial, sans-serif;">
-                <h3 style="margin: 0; color: #0f5132;">BẢO HIỂM XÃ HỘI CÁI NƯỚC</h3>
-                <h4 style="margin: 5px 0;">BÁO CÁO CÔNG TÁC PHÁT TRIỂN BHXH TỰ NGUYỆN</h4>
+                <h3 style="margin: 0; color: #0f5132;">BẢO HIỂM XÃ HỘI HUYỆN CÁI NƯỚC</h3>
+                <h4 style="margin: 5px 0;">BÁO CÁO BIẾN ĐỘNG BHXH TỰ NGUYỆN</h4>
                 <p style="margin: 0; font-style: italic;">Kỳ báo cáo: ${thangText}</p>
             </div>
         ` + document.getElementById('tableBaoCaoBienDong').outerHTML + '<br>' + document.getElementById('tableTienDoChiTieu').outerHTML;
@@ -387,7 +415,7 @@
         pdf.save(`BaoCao_BHXH_${document.getElementById('selectThangNam').value}.pdf`);
     }
 
-    // Tự động tải dữ liệu khi trang vừa mở
+    // Khởi động chạy ngay khi load trang
     window.onload = taiVaXuLyDuLieuExcelOnline;
 </script>
 </body>
