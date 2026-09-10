@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Báo Cáo BHXH Tự Nguyện Online</title>
+    <title>Hệ Thống Báo Cáo BHXH Tự Nguyện Online - Cái Nước</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Thư viện SheetJS đọc File Excel -->
@@ -30,7 +30,7 @@
     
     <!-- HEADER HỆ THỐNG -->
     <div class="header shadow mb-4 text-center">
-        <h3 class="fw-bold mb-1">🌐 BÁO CÁO BIẾN ĐỘNG BHXH TỰ NGUYỆN ONLINE</h3>
+        <h3 class="fw-bold mb-1">🌐 BÁO CÁO BIẾN ĐỘNG BHXH TỰ NGUYỆN ONLINE - CÁI NƯỚC</h3>
         <p class="mb-0 opacity-75">BHXH Cơ Sở - Tự động cập nhật dữ liệu từ kho lưu trữ GitHub</p>
     </div>
 
@@ -44,8 +44,6 @@
                 <select id="selectThangNam" class="form-select fw-bold text-primary" onchange="taiVaXuLyDuLieuExcelOnline()">
                     <option value="08_2026" selected>Tháng 08/2026</option>
                     <option value="07_2026">Tháng 07/2026</option>
-                    <option value="06_2026">Tháng 06/2026</option>
-                    <option value="05_2026">Tháng 05/2026</option>
                 </select>
             </div>
             <div class="col-md-5 text-end">
@@ -144,6 +142,38 @@
 
         document.querySelectorAll('.lblThang').forEach(el => el.innerText = thangHienThi);
 
+        let chiTieuXa = new Map();
+
+        // 1. TẢI VÀ ĐỌC FILE DANH MỤC (Lấy chỉ tiêu từ danhmucxa.xlsx)
+        try {
+            let resDM = await fetch('./data/danhmucxa.xlsx');
+            if (resDM.ok) {
+                let abDM = await resDM.arrayBuffer();
+                let wbDM = XLSX.read(new Uint8Array(abDM), { type: 'array' });
+                // Lấy sheet đầu tiên hoặc sheet tên 'ChiTieu'
+                let sheetDM = wbDM.Sheets["ChiTieu"] || wbDM.Sheets[wbDM.SheetNames[0]];
+                let dataDM = XLSX.utils.sheet_to_json(sheetDM, { defval: "" });
+                
+                dataDM.forEach(row => {
+                    let textToanDong = chuanHoaChuoi(Object.values(row).join(" "));
+                    let chiTieu = parseFloat(row["Chi_Tieu"] || row["Chỉ tiêu"] || row["Chỉ Tiêu"] || 0);
+                    if (chiTieu > 0) {
+                        for (let xa of danhSachXa) {
+                            if (textToanDong.includes(chuanHoaChuoi(xa))) {
+                                chiTieuXa.set(xa, chiTieu);
+                                break;
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.warn("Cảnh báo: Không tìm thấy file danhmucxa.xlsx");
+            }
+        } catch (error) {
+            console.error("Lỗi khi đọc file danhmucxa.xlsx:", error);
+        }
+
+        // 2. TẢI VÀ ĐỌC FILE DỮ LIỆU THÁNG THEO DROPDOWN
         const urlsToTry = [
             `./data/DuLieu_${thangKey}.xlsx`,
             `./data/dulieu_${thangKey}.xls`,
@@ -166,7 +196,7 @@
             statusEl.innerText = "❌ Không tìm thấy file Excel!";
             statusEl.className = "badge bg-danger p-2 me-2";
             xoaTrangBang();
-            return alert(`Không tìm thấy file Excel trong thư mục data cho tháng (${thangHienThi})!`);
+            return alert(`Không tìm thấy file dữ liệu cho Tháng ${thangHienThi}! Vui lòng kiểm tra lại thư mục data trên Github.`);
         }
 
         try {
@@ -174,12 +204,12 @@
             const sheetGoc = workbook.Sheets["Sheet0"] || workbook.Sheets[workbook.SheetNames[0]];
             const dataGoc = XLSX.utils.sheet_to_json(sheetGoc, { defval: "" });
 
-            let chiTieuXa = new Map();
+            // Backup: Nếu trong file dữ liệu cũng kẹp sẵn sheet ChiTieu thì đọc bổ sung
             if (workbook.Sheets["ChiTieu"]) {
                 const dataXa = XLSX.utils.sheet_to_json(workbook.Sheets["ChiTieu"], { defval: "" });
                 dataXa.forEach(row => {
                     let textToanDong = chuanHoaChuoi(Object.values(row).join(" "));
-                    let chiTieu = parseFloat(row["Chi_Tieu"] || row["Chỉ tiêu"] || 0);
+                    let chiTieu = parseFloat(row["Chi_Tieu"] || row["Chỉ tiêu"] || row["Chỉ Tiêu"] || 0);
                     if (chiTieu > 0) {
                         for (let xa of danhSachXa) {
                             if (textToanDong.includes(chuanHoaChuoi(xa))) {
@@ -196,7 +226,7 @@
             statusEl.innerText = "✅ Dữ liệu đã cập nhật!";
             statusEl.className = "badge bg-success p-2 me-2";
         } catch (error) {
-            console.error(error);
+            console.error("Lỗi xử lý bảng dữ liệu:", error);
             statusEl.innerText = "❌ Lỗi đọc file!";
             statusEl.className = "badge bg-danger p-2 me-2";
             xoaTrangBang();
