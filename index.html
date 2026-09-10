@@ -34,7 +34,7 @@
         <p class="mb-0 opacity-75">BHXH Cơ Sở - Tự động cập nhật dữ liệu từ kho lưu trữ GitHub</p>
     </div>
 
-    <!-- BỘ LỌC TỰ ĐỘNG LẤY DỮ LIỆU EXCEL THEO THÁNG (Bắt đầu từ tháng 07/2026) -->
+    <!-- BỘ LỌC TỰ ĐỘNG LẤY DỮ LIỆU EXCEL THEO THÁNG -->
     <div class="card p-3 mb-4 bg-white shadow-sm border-start border-success border-5">
         <div class="row align-items-center">
             <div class="col-md-3">
@@ -42,12 +42,10 @@
             </div>
             <div class="col-md-4">
                 <select id="selectThangNam" class="form-select fw-bold text-primary" onchange="taiVaXuLyDuLieuExcelOnline()">
-                    <option value="07_2026" selected>Tháng 07/2026</option>
-                    <option value="08_2026">Tháng 08/2026</option>
-                    <option value="09_2026">Tháng 09/2026</option>
-                    <option value="10_2026">Tháng 10/2026</option>
-                    <option value="11_2026">Tháng 11/2026</option>
-                    <option value="12_2026">Tháng 12/2026</option>
+                    <option value="08_2026" selected>Tháng 08/2026</option>
+                    <option value="07_2026">Tháng 07/2026</option>
+                    <option value="06_2026">Tháng 06/2026</option>
+                    <option value="05_2026">Tháng 05/2026</option>
                 </select>
             </div>
             <div class="col-md-5 text-end">
@@ -132,7 +130,7 @@
 
     async function taiVaXuLyDuLieuExcelOnline() {
         const selectBox = document.getElementById('selectThangNam');
-        const thangKey = selectBox.value; // Dạng "07_2026"
+        const thangKey = selectBox.value; 
         const thangHienThi = selectBox.options[selectBox.selectedIndex].text.replace('Tháng ', '');
         
         const statusEl = document.getElementById('statusLoading');
@@ -142,14 +140,11 @@
 
         document.querySelectorAll('.lblThang').forEach(el => el.innerText = thangHienThi);
 
-        // Đọc các định dạng file từ thư mục data
         const urlsToTry = [
             `./data/DuLieu_${thangKey}.xlsx`,
-            `./data/dulieu_${thangKey}.xlsx`,
-            `./data/DuLieu_${thangKey}.xls`,
             `./data/dulieu_${thangKey}.xls`,
-            `./data/dulieugoc.xlsx`,
-            `./data/dulieugoc.xls`
+            `./data/DuLieu_${thangKey}.xls`,
+            `./data/dulieu_${thangKey}.xlsx`
         ];
 
         let arrayBuffer = null;
@@ -176,12 +171,11 @@
             const dataGoc = XLSX.utils.sheet_to_json(sheetGoc, { defval: "" });
 
             let chiTieuXa = new Map();
-            if (workbook.Sheets["ChiTieu"] || workbook.Sheets["danhmucxa"]) {
-                const sheetCT = workbook.Sheets["ChiTieu"] || workbook.Sheets["danhmucxa"];
-                const dataXa = XLSX.utils.sheet_to_json(sheetCT, { defval: "" });
+            if (workbook.Sheets["ChiTieu"]) {
+                const dataXa = XLSX.utils.sheet_to_json(workbook.Sheets["ChiTieu"], { defval: "" });
                 dataXa.forEach(row => {
-                    let ten = row["Ten_Xa"] || row["Tên Xã"] || row["Xã"] || row["ten_xa"] || "";
-                    let chiTieu = parseFloat(row["Chi_Tieu"] || row["Chỉ tiêu"] || row["chi_tieu"] || 0);
+                    let ten = row["Ten_Xa"] || row["Tên Xã"] || row["Xã"] || "";
+                    let chiTieu = parseFloat(row["Chi_Tieu"] || row["Chỉ tiêu"] || 0);
                     let matchedXa = mapChuanXa.get(chuanHoaChuoi(ten));
                     if (matchedXa && chiTieu > 0) chiTieuXa.set(matchedXa, chiTieu);
                 });
@@ -199,84 +193,102 @@
         }
     }
 
-    function parseThangNam(str) {
-        if (!str) return null;
-        let s = str.toString().trim();
-        // Nhận diện định dạng MM/YYYY hoặc M/YYYY hoặc YYYY-MM
-        let parts = s.includes('/') ? s.split('/') : (s.includes('-') ? s.split('-').reverse() : []);
-        if (parts.length >= 2) {
-            let m = parseInt(parts[0], 10);
-            let y = parseInt(parts[1], 10);
-            if (!isNaN(m) && !isNaN(y)) return { month: m, year: y, totalMonths: y * 12 + m };
+    // Hàm bóc tách lấy Tháng/Năm dạng MM/YYYY bất kể định dạng đầu vào
+    function parseThangNam(val) {
+        if (!val) return "";
+        let str = val.toString().trim();
+
+        // Xử lý nếu file Excel xuất ra ngày chuẩn D/M/YYYY hoặc DD/MM/YYYY
+        if (str.includes('/')) {
+            let parts = str.split('/');
+            if (parts.length === 3) {
+                let m = parts[1].padStart(2, '0');
+                let y = parts[2].split(' ')[0];
+                return `${m}/${y}`;
+            } else if (parts.length === 2) {
+                let m = parts[0].padStart(2, '0');
+                let y = parts[1].split(' ')[0];
+                return `${m}/${y}`;
+            }
         }
-        return null;
+        
+        // Xử lý dạng YYYY-MM-DD
+        if (str.includes('-')) {
+            let parts = str.split('-');
+            if (parts.length >= 2) {
+                let y = parts[0];
+                let m = parts[1].padStart(2, '0');
+                if (y.length === 4) return `${m}/${y}`;
+            }
+        }
+
+        return str;
     }
 
     function tinhToanVahienThiBaoCao(dataGoc, chiTieuXa, thangKey) {
         let stats = { active: 0, brandNew: 0, returning: 0, dropped: 0 };
         let thongKeXa = {};
 
+        // Khởi tạo các xã cố định
         danhSachXa.forEach(xa => {
             thongKeXa[xa] = { dangThamGia: 0, tangMoi: 0, quayLai: 0, ngungDong: 0 };
         });
 
-        const keyParts = thangKey.split('_');
-        const reportMonth = parseInt(keyParts[0], 10);
-        const reportYear = parseInt(keyParts[1], 10);
-        const reportTotalMonths = reportYear * 12 + reportMonth;
+        const partsKey = thangKey.split('_');
+        const mTarget = parseInt(partsKey[0], 10);
+        const yTarget = parseInt(partsKey[1], 10);
+        const thangChuan = `${partsKey[0]}/${yTarget}`; // "07/2026" hoặc "08/2026"
 
         dataGoc.forEach(row => {
             let tenXaRaw = "";
             let denThangVal = "";
 
+            // Lọc cột Tên Xã (Ưu tiên cột văn bản, loại bỏ các cột Mã Xã/Mã Đơn Vị dạng số)
             Object.keys(row).forEach(key => {
                 let kClean = chuanHoaChuoi(key);
-                if (kClean.includes("xa lien he") || kClean.includes("xa khai sinh") || kClean.includes("ten xa") || kClean === "xa" || kClean.includes("dia chi")) {
-                    if (!tenXaRaw) tenXaRaw = row[key];
+                let val = row[key] ? row[key].toString().trim() : "";
+
+                // Loại trừ các cột chứa chữ "mã" (Mã xã, Mã đơn vị)
+                if (!kClean.includes("ma") && (kClean.includes("xa lien he") || kClean.includes("xa khai sinh") || kClean.includes("ten xa") || kClean === "xa" || kClean.includes("dia chi"))) {
+                    if (!tenXaRaw && isNaN(val)) tenXaRaw = val;
                 }
-                if (kClean.includes("den thang") || kClean.includes("den thg") || kClean === "thang" || kClean.includes("den_thang")) {
-                    if (!denThangVal) denThangVal = row[key];
+
+                if (kClean.includes("den thang") || kClean.includes("den thg") || kClean === "thang") {
+                    if (!denThangVal) denThangVal = val;
                 }
             });
 
-            tenXaRaw = tenXaRaw ? tenXaRaw.toString().trim() : "";
-            denThangVal = denThangVal ? denThangVal.toString().trim() : "";
-
-            let matchedXa = mapChuanXa.get(chuanHoaChuoi(tenXaRaw));
-            if (!matchedXa && tenXaRaw !== "") {
-                let cleanXa = tenXaRaw.replace(/Xã|Thị trấn|Phường/gi, '').trim();
-                matchedXa = mapChuanXa.get(chuanHoaChuoi(cleanXa));
+            // Nếu không quét được theo tên cột chuẩn, lấy cột văn bản có chứa tên xã thuộc danh mục
+            if (!tenXaRaw) {
+                Object.values(row).forEach(v => {
+                    let vClean = chuanHoaChuoi(v);
+                    if (mapChuanXa.has(vClean)) tenXaRaw = v.toString();
+                });
             }
 
-            let dtObj = parseThangNam(denThangVal);
-            
-            // Nếu không ghi tháng hoặc tháng >= mốc chốt (VD: 06/2026 trở đi) thì tính là Đang tham gia
-            let isDangThamGia = false;
+            let tenXa = mapChuanXa.get(chuanHoaChuoi(tenXaRaw));
+            let denThangParsed = parseThangNam(denThangVal);
+
+            let isDangThamGia = (denThangParsed === thangChuan);
             let isNgungDong = false;
 
-            if (dtObj) {
-                // Người có Đến tháng >= mốc dữ liệu gốc (Tháng 6/2026 trở đi)
-                if (dtObj.totalMonths >= (reportTotalMonths - 1)) {
-                    isDangThamGia = true;
-                } else if (dtObj.totalMonths < (reportTotalMonths - 1)) {
-                    isNgungDong = true;
+            if (!isDangThamGia && denThangParsed !== "") {
+                let dtParts = denThangParsed.split('/');
+                if (dtParts.length === 2) {
+                    let m = parseInt(dtParts[0], 10);
+                    let y = parseInt(dtParts[1], 10);
+                    if (y < yTarget || (y === yTarget && m < mTarget)) {
+                        isNgungDong = true;
+                    }
                 }
-            } else {
-                // Nếu không có thông tin Đến tháng -> mặc định tính đang tham gia
-                isDangThamGia = true;
             }
 
-            let keyXa = matchedXa || (tenXaRaw ? tenXaRaw.replace(/Xã|Thị trấn|Phường/gi, '').trim() : null);
-
-            if (keyXa) {
-                if (!thongKeXa[keyXa]) {
-                    thongKeXa[keyXa] = { dangThamGia: 0, tangMoi: 0, quayLai: 0, ngungDong: 0 };
-                }
+            if (tenXa) {
                 if (isDangThamGia) {
-                    thongKeXa[keyXa].dangThamGia++;
+                    thongKeXa[tenXa].dangThamGia++;
                     stats.active++;
                 } else if (isNgungDong) {
-                    thongKeXa[keyXa].ngungDong++;
+                    thongKeXa[tenXa].ngungDong++;
                     stats.dropped++;
                 }
             }
